@@ -1,0 +1,12 @@
+{
+  "default": {
+    "tableName": "",
+    "buckets": [
+        {
+            "bucketName": "",
+            "bucketOwner": ""
+        }
+    ],
+    "backupTtl": 2
+  }
+}
