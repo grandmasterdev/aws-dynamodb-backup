@@ -52,7 +52,7 @@ export const deleteSnapshot = async (
       }
     });
 
-    for (let i = 0; i < backupToDelete.length - 1; i++) {
+    for (let i = 0; i < backupToDelete.length; i++) {
       const params = {
         BackupArn: backupToDelete[i].BackupArn,
       };

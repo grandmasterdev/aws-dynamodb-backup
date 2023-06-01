@@ -17,9 +17,11 @@ const db = new DynamoDB({});
 const dbc = new DynamoDBClient({})
 
 export const shareSnapshot = async (
-  event: CloudWatchLogsEvent,
+  event: Event,
   context: Context
 ) => {
+  console.log('event', event);
+
   if (!TABLE_NAME) {
     throw new Error(`[shareSnapshot] missing table name constant value`);
   }
@@ -41,17 +43,23 @@ export const shareSnapshot = async (
   const bucketNames = getBucketNameFromStr(BUCKET_NAMES ?? "");
   const bucketOwners = getBucketOwnerFromStr(BUCKET_OWNERS ?? "");
 
+  console.log('bucketNames', bucketNames);
+  console.log('bucketOwners', bucketOwners);
+
   try {
-    for (let i = 0; i < bucketNames.length - 1; i++) {
+    for (let i = 0; i < bucketNames.length; i++) {
+      console.log('bucketNames[i]', bucketNames[i])
       if (!bucketNames[i]) {
         break;
       }
+
+      console.log('[shareSnapshot] bucketName: ' + bucketNames[i])
 
       const params: ExportTableToPointInTimeCommandInput = {
         TableArn: tableDetail.Table.TableArn,
         S3Bucket: bucketNames[i],
         S3BucketOwner: bucketOwners[i],
-        S3Prefix: "carwash-voucher-db",
+        S3Prefix: `carwash-voucher-db/${event.backupName}`,
         ExportFormat: "DYNAMODB_JSON"
       };
 
@@ -60,9 +68,15 @@ export const shareSnapshot = async (
       if (!data) {
         throw new Error(`[shareSnapshot] missing data`);
       }
+
+      console.log(`[shareSnapshot] export triggered with response`, data);
     }
   } catch (err) {
     console.error(err);
     throw err;
   }
 };
+
+export interface Event {
+  backupName: string
+}
