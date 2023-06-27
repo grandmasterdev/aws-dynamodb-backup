@@ -13,7 +13,7 @@ You may configure the infra by using the `cdk context` file like the following:
 ```json
 
 {
-  "default": {
+  "_": {
     "tableName": "my-table",
     "buckets": [
       {
@@ -25,28 +25,34 @@ You may configure the infra by using the `cdk context` file like the following:
         "bucketOwner": "123456789013"
       }
     ],
-    "backupTtl": 7, // Days
-    "backupRate": {
+    "backup": {
+      "option": "cron",
+      "backupTtl": 2, // Days
+      "backupCron": {
+        "minute": "0",
+        "hour": "0"
+      },
+      "backupRate": {
         "type": "days", // Excepted values - 'days' | 'minutes' | 'seconds'
         "value": 1
-    }
+      }
   },
   "prod": {} // Your environment. It will inherit the `default` props.
 }
 
 ```
 
-The infra configuration uses a module called [aws-cdk-config-builder](https://www.npmjs.com/package/aws-cdk-config-builder). Checkout for more configuration info.
+The infra configuration uses a module called [@aws-cdk-tools/config-builder](https://www.npmjs.com/package/@aws-cdk-tools/config-builder). Checkout for more configuration info.
 
-## Miscellaneous 
+## Miscellaneous
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
 ## Useful commands
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `cdk deploy`      deploy this stack to your default AWS account/region
-* `cdk diff`        compare deployed stack with current state
-* `cdk synth`       emits the synthesized CloudFormation template
+- `npm run build` compile typescript to js
+- `npm run watch` watch for changes and compile
+- `npm run test` perform the jest unit tests
+- `cdk deploy` deploy this stack to your default AWS account/region
+- `cdk diff` compare deployed stack with current state
+- `cdk synth` emits the synthesized CloudFormation template
