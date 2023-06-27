@@ -11,7 +11,7 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Rule, Schedule } from "aws-cdk-lib/aws-events";
 import { SfnStateMachine } from "aws-cdk-lib/aws-events-targets";
-import builder from "aws-cdk-config-builder";
+import builder from "@aws-cdk-tools/config-builder";
 
 export class AwsDynamodbBackupStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -19,9 +19,7 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
 
     const config = builder
       .getInstance(this)
-      .build<CdkConfig>(
-        this.node.tryGetContext("environment") ?? "default"
-      ) as CdkConfig;
+      .build<CdkConfig>(this.node.tryGetContext("environment") ?? "default");
 
     /**
      * Lambdas
@@ -47,7 +45,7 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
       timeout: cdk.Duration.minutes(5),
       environment: {
         TABLE_NAME: config.tableName,
-        BACKUP_TTL: config.backupTtl.toString(),
+        BACKUP_TTL: config.backup.backupTtl.toString(),
         BUCKET_NAMES: this.parseBucketNamesToStr(config.buckets),
         BUCKET_OWNERS: this.parseBucketOwnerToStr(config.buckets),
       },
@@ -57,21 +55,21 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
       ...(defaultFunctionProps as FunctionProps),
       handler: "create-snapshot.createSnapshot",
       code: Code.fromAsset("dist/create"),
-      functionName: 'dynamodb-create-snapshot'
+      functionName: "dynamodb-create-snapshot",
     });
 
     const deleteSnapshotFn = new Function(this, `delete-snapshot-function`, {
       ...(defaultFunctionProps as FunctionProps),
       handler: "delete-snapshot.deleteSnapshot",
       code: Code.fromAsset("dist/delete"),
-      functionName: 'dynamodb-delete-snapshot'
+      functionName: "dynamodb-delete-snapshot",
     });
 
     const shareSnapshotFn = new Function(this, `share-snapshot-function`, {
       ...(defaultFunctionProps as FunctionProps),
       handler: "share-snapshot.shareSnapshot",
       code: Code.fromAsset("dist/share"),
-      functionName: 'dynamodb-share-snapshot'
+      functionName: "dynamodb-share-snapshot",
     });
 
     /**
@@ -81,11 +79,11 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
       stateMachineName: "aws-dynamodb-backup",
       definition: new LambdaInvoke(this, `create-snapshot-state`, {
         lambdaFunction: createSnapshotFn,
-        resultPath: '$.result'
+        resultPath: "$.result",
       }).next(
         new LambdaInvoke(this, `share-snapshot-state`, {
           lambdaFunction: shareSnapshotFn,
-          inputPath: '$.result.Payload'
+          inputPath: "$.result.Payload",
         }).next(
           new LambdaInvoke(this, `delete-snapshot-state`, {
             lambdaFunction: deleteSnapshotFn,
@@ -97,18 +95,32 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
     /**
      * Cloudwatch event
      */
-    const backupRate = this.getBackupRate(config.backupRate);
-    const rule = new Rule(this, "Rule", {
-      schedule: Schedule.rate(backupRate),
-    });
+    let rule;
+
+    if (config.backup.option === "rate") {
+      const backupRate = this.getBackupRate(
+        config.backup.backupRate as BackupRate
+      );
+
+      rule = new Rule(this, "Rule", {
+        schedule: Schedule.rate(backupRate),
+      });
+    } else {
+      rule = new Rule(this, "Rule", {
+        schedule: Schedule.cron({
+          minute: config.backup.backupCron?.minute,
+          hour: config.backup.backupCron?.hour,
+        }),
+      });
+    }
 
     rule.addTarget(new SfnStateMachine(dynamodbBackupStateMachine));
   }
 
   /**
-   * 
-   * @param buckets 
-   * @returns 
+   *
+   * @param buckets
+   * @returns
    */
   private parseBucketNamesToStr(buckets: BucketProps[]) {
     let bucketNames = "";
@@ -125,9 +137,9 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
   }
 
   /**
-   * 
-   * @param buckets 
-   * @returns 
+   *
+   * @param buckets
+   * @returns
    */
   private parseBucketOwnerToStr(buckets: BucketProps[]) {
     let bucketOwners = "";
@@ -144,12 +156,12 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
   }
 
   /**
-   * 
-   * @param backupRate 
-   * @returns 
+   *
+   * @param backupRate
+   * @returns
    */
   private getBackupRate(backupRate: BackupRate) {
-    if(backupRate && backupRate.type && backupRate.value) {
+    if (backupRate && backupRate.type && backupRate.value) {
       return cdk.Duration[backupRate.type](backupRate.value);
     }
 
@@ -160,8 +172,7 @@ export class AwsDynamodbBackupStack extends cdk.Stack {
 export type CdkConfig = {
   tableName: string;
   buckets: BucketProps[];
-  backupTtl: number;
-  backupRate: BackupRate;
+  backup: Backup;
 };
 
 export type BucketProps = {
@@ -169,7 +180,19 @@ export type BucketProps = {
   bucketOwner: string;
 };
 
+export type Backup = {
+  option: "cron" | "rate";
+  backupTtl: number;
+  backupRate?: BackupRate;
+  backupCron?: BackupCron;
+};
+
 export type BackupRate = {
-  type: 'days' | 'minutes' | 'seconds';
-  value: number
-}
+  type: "days" | "minutes" | "seconds";
+  value: number;
+};
+
+export type BackupCron = {
+  minute?: string;
+  hour?: string;
+};
